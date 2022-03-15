@@ -84,6 +84,13 @@ const servers = [];
 const connectIds = [];
 
 /**
+ * A map of a websocket to a connection handler. Is used to send incomming messages
+ * to the right handler.
+ * @type {Map<ws, ConnectionHandler>}
+ */
+const connections = new Map();
+
+/**
  * Get a server by id.
  * 
  * @param {number} id The id of the server to get.
@@ -106,7 +113,7 @@ function getServer(id) {
  */
 function getConnectId(id) {
     for (const connectId of connectIds) {
-        if (connectId.id == id) {
+        if (connectId.connectId == id) {
             return connectId;
         }
     }
@@ -131,30 +138,90 @@ function getConnectedUserByWebsocket(websocket) {
 }
 
 /**
+ * Something capable of handling incomming messages connections.
+ */
+class ConnectionHandler {
+    /**
+     * Handle an incomming message.
+     * 
+     * @param {string} message The received message.
+     * @abstract
+     */
+    onMessage(message) {
+        throw new Error("onMessage is an abstract method that needs to be implemented.");
+    }
+}
+
+/**
  * Data from a plugin / a server, that clients can connect to.
  */
-class ServerData {
+class ServerData extends ConnectionHandler {
     /**
      * Create a new ServerData.
      * 
-     * @param {number} id The id of the server.
+     * @param {string} id The id of the server.
+     * @param {ws} websocket The connection to the plugin.
      */
     constructor(id, websocket) {
         /**
          * The id of the server.
-         * @type {number}
+         * @type {string}
          */
         this.id = id;
         /**
          * The websocket connection to the server.
          * @type {ws}
-         * */
+         */
         this.websocket = websocket;
         /**
          * A list of users that are connected to this server.
          * @type {ConnectedUser[]}
          */
         this.connectedUsers = [];
+    }
+
+    /**
+     * Get a connected user by id.
+     * 
+     * @param {string} userId The id of the user to get.
+     * @returns {ConnectedUser | null} The connected user, or null if not found.
+     */
+    getConnectedUserById(userId) {
+        for (const connectedUser of this.connectedUsers) {
+            if (connectedUser.id == userId) {
+                return connectedUser;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Called when the server sends a message to the svcraft-audio websocket server.
+     * 
+     * @param {string} message The message.
+     */
+    onMessage(message) {
+        // Forward messages to users
+        if (message.startsWith("To ")) {
+            const match = /^To (?<userId>[A-z0-9]+): (?<userMessage>.*)/.exec(message);
+            const { userId, userMessage } = match.groups;
+
+            const user = this.getConnectedUserById(userId);
+            if (user != null) {
+                user.websocket.send(userMessage);
+            } else {
+                console.warn("Tried to send message to user that wasn't connected: " + toUsername);
+            }
+        }
+
+        // Creation of new connect ids
+        if (message.startsWith("New connect id: ")) {
+            const match = /New connect id: (?<connectId>[A-z0-9]+) with user id (?<userId>[A-z0-9]+) and with username: (?<username>.+)/.exec(message);
+            const { connectId, userId, username } = match.groups;
+
+            const data = new ConnectIdData(connectId, userId, username, this);
+            connectIds.push(data);
+        }
     }
 }
 
@@ -166,27 +233,39 @@ class ConnectIdData {
     /**
      * Create a new ConnectIdData.
      * 
-     * @param {string} id The connect id.
+     * @param {string} connectId The connect id.
+     * @param {string} userId The user id.
      * @param {string} username The username of the player.
+     * @param {ServerData} server The server to connect the user to.
      */
-    constructor(id, username) {
+    constructor(connectId, userId, username, server) {
         /**
          * The connect id.
          * @type {string}
          */
-        this.id = id;
+        this.connectId = connectId;
+        /**
+         * The user id.
+         * @type {string}
+         */
+        this.userId = userId;
         /**
          * The username of the player.
          * @type {string}
          */
         this.username = username;
+        /**
+         * The server to connect the user to.
+         * @type {ServerData}
+         */
+        this.server = server;
     }
 }
 
 /**
  * A user that is connected.
  */
-class ConnectedUser {
+class ConnectedUser extends ConnectionHandler {
     /**
      * Create a new ConnectedUser.
      * 
@@ -198,7 +277,7 @@ class ConnectedUser {
         /**
          * The web socket to the user.
          * @type {ws}
-         * */
+         */
         this.websocket = websocket;
         /**
          * The id of the user. This will be their peer id that is used to connect
@@ -214,7 +293,53 @@ class ConnectedUser {
         this.username = username;
     }
 
+    /**
+     * Called when the user sends a message to the svcraft-audio websocket server.
+     * 
+     * @param {string} message The message.
+     */
+    onMessage(message) {
+        
+    }
 }
+
+
+// Main handler
+
+websocketServer.on("connection", function(websocket) {
+    console.log("New connection");
+    websocket.on("message", function (rawMessage) {
+        try {
+            const message = Buffer.isBuffer(rawMessage) ? rawMessage.toString("utf-8") : rawMessage;
+            const handler = connections.get(websocket);
+            if (handler != null) {
+                handler.onMessage(message);
+            } else {
+                // Handshaking, probably
+                if (message.startsWith()) {
+                    const match = /I am a server with id (?<serverId>[A-z0-9]+)/.match(message);
+                    const { serverId } = match.groups;
+                    
+                    let server = getServer(serverId);
+                    if (server == null) {
+                        // A new server
+                        server = new ServerData(serverId, websocket);
+                        servers.push(server);
+                    } else {
+                        // Replace the server connection
+                        if (server.websocket.readyState == server.websocket.OPEN) {
+                            server.websocket.close();
+                        }
+                        server.websocket = websocket;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Error while handling websocket message");
+            console.error(e);
+        }
+    });
+});
 
 // Start
 
