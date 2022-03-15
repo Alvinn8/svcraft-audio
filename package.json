@@ -1,7 +1,22 @@
 {
+  "name": "svcraft-audio",
+  "version": "1.0.0",
+  "description": "The server running the peer connection broker, static web server, and the svcraft-audio websocket server.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alvinn8/svcraft-audio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Alvinn8/svcraft-audio/issues"
+  },
+  "homepage": "https://github.com/Alvinn8/svcraft-audio#readme",
   "dependencies": {
     "express": "^4.17.3",
     "peer": "^0.6.1",
-    "ws": "^8.5.0"
-  }
+    "ws": "^7.5.7"
+  },
+  "devDependencies": {}
 }
