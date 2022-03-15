@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>SVCraft Audio</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.3.1/dist/peerjs.min.js"></script>
+    
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+</head>
+<body>
+
+    <div id="loading" class="page" style="display: block;">
+        <div class="position-absolute top-50 start-50 translate-middle text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p id="loading-text">Please allow the microphone permissions.</p>
+        </div>
+    </div>
+
+    <div id="invalid-link" class="page">
+        <h2 class="display-1"><i class="bi bi-link"></i> Invalid Link</h2>
+        <p>The link you are using to svcraft audio is not valid, please run <code class="select-all">/audio</code> in game to get a fresh link.</p>
+    </div>
+
+    <div id="no-microphone" class="page">
+        <h2 class="display-1 text-center"><span class="text-danger"><i class="bi bi-mic-mute"></i></span> No microphone</h2>
+        <p class="text-center"><span>You have disabled the microphone (or it could not be activated for some reason). Error: </span><span id="no-microphone-error"></span></p>
+    </div>
+
+    <div id="connecting" class="page container">
+        <h2 class="display-1"><i class="bi bi-broadcast-pin"></i> Connecting...</h2>
+        <p id="connecting-status"></p>
+    </div>
+
+    <div id="ready" class="page container">
+        <h2 class="display-1">Done!</h2>
+        <p>Welcome <span id="ready-username"></span>, when players are nearby you in game you will be able to hear them here.</p>
+        <div>
+            <p>Test your microphone
+            <span id="test-microphone">
+                <i class="bi bi-play-fill" id="test-microphone-icon"></i>
+            </span></p>
+            <audio id="test-microphone-audio"></audio>
+            <p id="test-microphone-warning" style="display: none;">Use headphones when testing your microphone.</p>
+        </div>
+        <button class="btn btn-info" id="resync-button" style="display: none;">Resync</button>
+    </div>
+
+    <div id="connection-lost" class="page">
+        <h2 class="display-1 text-center"><span class="text-danger"><i class="bi bi-broadcast-pin"></i></span> Connection lost</h2>
+        <p class="text-center">The connection to the server was lost, try reloading the page.</p>
+    </div>
+
+    <div id="left-the-game" class="page">
+        <h2 class="display-1 text-center">Goodbye!</h2>
+        <p class="text-center">You left the server. See you later!</p>
+    </div>
+
+    <div id="not-on-server" class="page">
+        <h2 class="display-1 text-center"><i class="bi bi-search"></i> You are not on the server</h2>
+        <p class="text-center">You are not on the server, join the server before connecting via svcraft-audio.</p>
+    </div>
+
+    <div id="connected-elsewhere" class="page">
+        <h2 class="display-1 text-center">You connected somewhere else</h2>
+        <div class="text-center">
+            <p>You have connected somewhere else, probably on another tab.</p>
+            <p>Try reloading the page.</p>
+        </div>
+    </div>
+
+    <div id="status" class="position-fixed bottom-0 end-0 mb-3">
+        <table>
+            <tbody>
+                <tr>
+                    <td>svcraft-audio connection</td>
+                    <td>
+                        <span id="svcraft-audio-connection">
+                            <div class="spinner-border" role="status"></div>
+                            <span>Loading...</span>
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Server Connection</td>
+                    <td>
+                        <span id="server-connection">
+                            <div class="spinner-border" role="status"></div>
+                            <span>Loading...</span>
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Peer Connection</td>
+                    <td>
+                        <span id="peer-connection">
+                            <div class="spinner-border" role="status"></div>
+                            <span>Loading...</span>
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Connected Peers</td>
+                    <td>
+                        <span id="connected-peers">
+                            <div class="spinner-border" role="status"></div>
+                            <span>Loading...</span>
+                        </span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

@@ -1,0 +1,18 @@
+.page {
+    display: none;
+}
+
+#status {
+    width: 325px;
+}
+
+.select-all {
+    user-select: all;
+}
+
+#test-microphone {
+    font-size: 36px;
+    position: relative;
+    top: 6px;
+    cursor: pointer;
+}

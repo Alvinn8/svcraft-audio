@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const ws = require("ws");
+const path = require("path");
 const { ExpressPeerServer } = require("peer");
 
 const PORT = process.env.WEB_PORT || 8000;
@@ -30,10 +31,10 @@ for (const func of server.listeners("upgrade")) {
 
 // === Static HTTP Server ===
 
-app.use(express.static(__dirname));
+app.use(express.static(path.resolve(__dirname, "../web")));
 
 app.get("/", (request, response) => {
-    response.sendFile(__dirname + "/index.html");
+    response.sendFile(path.resolve(__dirname, "../web/index.html"));
 });
 
 app.get("/test", (request, response) => {
