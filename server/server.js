@@ -7,11 +7,11 @@ const { ExpressPeerServer } = require("peer");
 const PORT = process.env.WEB_PORT || 8000;
 
 const app = express();
-const server = http.createServer(app);
+const httpServer = http.createServer(app);
 
 // === Peer Server ===
 
-const peerServer = ExpressPeerServer(server, {
+const peerServer = ExpressPeerServer(httpServer, {
     proxied: true,
     debug: true,
     path: '/peer',
@@ -24,8 +24,8 @@ app.use(peerServer);
 // http server we need to handle upgrades manually and forward it to the correct
 // websocket. See below.
 let peerWebSocketListener;
-for (const func of server.listeners("upgrade")) {
-    server.removeListener("upgrade", func);
+for (const func of httpServer.listeners("upgrade")) {
+    httpServer.removeListener("upgrade", func);
     peerWebSocketListener = func;
 }
 
@@ -49,23 +49,23 @@ app.get("/test", (request, response) => {
 
 const websocketServer = new ws.Server({ noServer: true });
 
-websocketServer.on("connection", function(ws) {
+websocketServer.on("connection", function(websocket) {
     console.log("New connection");
-    ws.on("message", function (rawMessage) {
+    websocket.on("message", function (rawMessage) {
         console.log("Got a message");
-        ws.send(rawMessage);
+        websocket.send(rawMessage);
     });
 });
 
-server.on("upgrade", function(request, socket, head) {
+httpServer.on("upgrade", function(request, socket, head) {
     if (request.url && request.url.startsWith("/peer")) {
         // A connection to the peer, let the peer server handle the request
         peerWebSocketListener(request, socket, head);
     } else {
         // A connection to the svcraft-audio websocket, let the websocketServer
         // handle the request.
-        websocketServer.handleUpgrade(request, socket, head, function(socket) {
-            websocketServer.emit("connection", socket, request);
+        websocketServer.handleUpgrade(request, socket, head, function(socket2) {
+            websocketServer.emit("connection", socket2, request);
         });
     }
 });
@@ -163,6 +163,7 @@ class ServerData extends ConnectionHandler {
      * @param {ws} websocket The connection to the plugin.
      */
     constructor(id, websocket) {
+        super();
         /**
          * The id of the server.
          * @type {string}
@@ -193,6 +194,17 @@ class ServerData extends ConnectionHandler {
             }
         }
         return null;
+    }
+
+    /**
+     * Send a message to all connected users.
+     * 
+     * @param {string} message The message to send to all connected users.
+     */
+    sendToAll(message) {
+        for (const connectedUser of this.connectedUsers) {
+            connectedUser.websocket.send(message);
+        }
     }
 
     /**
@@ -260,6 +272,14 @@ class ConnectIdData {
          */
         this.server = server;
     }
+
+    /**
+     * Check whether this connect id is still valid.
+     * @returns {boolean} Whether this connect id is valid.
+     */
+    isValid() {
+        return this.server.websocket.readyState == this.server.websocket.OPEN;
+    }
 }
 
 /**
@@ -271,9 +291,10 @@ class ConnectedUser extends ConnectionHandler {
      * 
      * @param {ws} websocket The web socket to the user.
      * @param {string} id The id of the user.
-     * @param {string} username The username of the player.
+     * @param {ServerData} server The server this user is connected to.
      */
-    constructor(websocket, id, username) {
+    constructor(websocket, id, server) {
+        super();
         /**
          * The web socket to the user.
          * @type {ws}
@@ -287,10 +308,10 @@ class ConnectedUser extends ConnectionHandler {
          */
         this.id = id;
         /**
-         * The username of the player.
-         * @type {string}
-        */
-        this.username = username;
+         * The server this user is connected to.
+         * @type {ServerData}
+         */
+        this.server = server;
     }
 
     /**
@@ -299,7 +320,13 @@ class ConnectedUser extends ConnectionHandler {
      * @param {string} message The message.
      */
     onMessage(message) {
-        
+        if (message.startsWith("Warning ")) {
+            if (this.server != null) {
+                const match = /Warning (?<warning>.+)/.match(message);
+                const { warning } = match.groups;
+                this.server.websocket.send("Warning from user " + this.username + ": " + warning);
+            }
+        }
     }
 }
 
@@ -316,7 +343,9 @@ websocketServer.on("connection", function(websocket) {
                 handler.onMessage(message);
             } else {
                 // Handshaking, probably
-                if (message.startsWith()) {
+
+                // A (new) server
+                if (message.startsWith("I am a server")) {
                     const match = /I am a server with id (?<serverId>[A-z0-9]+)/.match(message);
                     const { serverId } = match.groups;
                     
@@ -325,12 +354,37 @@ websocketServer.on("connection", function(websocket) {
                         // A new server
                         server = new ServerData(serverId, websocket);
                         servers.push(server);
+                        connections.set(websocket, server);
                     } else {
                         // Replace the server connection
                         if (server.websocket.readyState == server.websocket.OPEN) {
                             server.websocket.close();
                         }
                         server.websocket = websocket;
+                    }
+                }
+
+                // A new client (user)
+                if (message.startsWith("I am a user")) {
+                    const match = /I am a user, connect id: (?<connectId>.+)/.exec(message);
+                    const { connectId } = match.groups;
+
+                    const connectIdData = getConnectId(connectId);
+
+                    if (connectIdData != null && connectIdData.isValid()) {
+                        const server = connectIdData.server;
+                        const user = new ConnectedUser(websocket, connectIdData.userId, server);
+                        server.connectedUsers.push(user);
+                        connections.set(websocket, user);
+                        
+                        // Notify server
+                        server.websocket.send("User connected with id: " + connectIdData.userId);
+                        
+                        // Notify user
+                        websocket.send("Welcome, your user id: " + connectIdData.userId + " username is: " + connectIdData.username);
+                    } else {
+                        websocket.send("Invalid link");
+                        websocket.close();
                     }
                 }
             }
@@ -343,5 +397,5 @@ websocketServer.on("connection", function(websocket) {
 
 // Start
 
-server.listen(PORT);
+httpServer.listen(PORT);
 console.log("Server listening on port " + PORT);
