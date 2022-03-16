@@ -37,14 +37,6 @@ app.get("/", (request, response) => {
     response.sendFile(path.resolve(__dirname, "../web/index.html"));
 });
 
-app.get("/test", (request, response) => {
-    response.statusCode = 426;
-    response.contentType = "text/plain";
-    const body = http.STATUS_CODES[426];
-
-    response.end(body);
-});
-
 // === Web Socket ===
 
 const websocketServer = new ws.Server({ noServer: true });
