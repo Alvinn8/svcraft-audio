@@ -1,0 +1,6 @@
+name: SVCraftAudio
+version: '${project.version}'
+main: ca.bkaw.svcraftaudio.SVCraftAudio
+api-version: 1.13
+depend: [ SVCraft ]
+authors: [ Alvin ]

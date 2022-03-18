@@ -88,9 +88,24 @@ const connections = new Map();
  * @param {number} id The id of the server to get.
  * @returns {ServerData | null} The found server, or null.
  */
-function getServer(id) {
+function getServerById(id) {
     for (const server of servers) {
         if (server.id == id) {
+            return server;
+        }
+    }
+    return null;
+}
+
+/**
+ * Get a server by websocket.
+ * 
+ * @param {ws} websocket The websocket to get the server for.
+ * @returns {ServerData | null} The found server, or null.
+ */
+ function getServerByWebsocket(websocket) {
+    for (const server of servers) {
+        if (server.websocket == websocket) {
             return server;
         }
     }
@@ -116,7 +131,7 @@ function getConnectId(id) {
  * Get a ConnectedUser instance from a websocket.
  * 
  * @param {ws} websocket The websocket to get the user for.
- * @returns {ws | null} The ConnectedUser instance, or null if none is found.
+ * @returns {ConnectedUser | null} The ConnectedUser instance, or null if none is found.
  */
 function getConnectedUserByWebsocket(websocket) {
     for (const server of servers) {
@@ -195,7 +210,9 @@ class ServerData extends ConnectionHandler {
      */
     sendToAll(message) {
         for (const connectedUser of this.connectedUsers) {
-            connectedUser.websocket.send(message);
+            if (connection.websocket.readyState == 1) {
+                connectedUser.websocket.send(message);
+            }
         }
     }
 
@@ -225,6 +242,11 @@ class ServerData extends ConnectionHandler {
 
             const data = new ConnectIdData(connectId, userId, username, this);
             connectIds.push(data);
+        }
+
+        // Resync
+        if (message == "resync") {
+            this.sendToAll("resync");
         }
     }
 }
@@ -319,6 +341,12 @@ class ConnectedUser extends ConnectionHandler {
                 this.server.websocket.send("Warning from user " + this.username + ": " + warning);
             }
         }
+
+        if (message.startsWith("connected-peers")) {
+            if (serverConnection != null) {
+                serverConnection.websocket.send("Peer info from " + this.username + ": " + message.substring("connected-peers".length));
+            }
+        }
     }
 }
 
@@ -341,7 +369,7 @@ websocketServer.on("connection", function(websocket) {
                     const match = /I am a server with id (?<serverId>[A-z0-9]+)/.match(message);
                     const { serverId } = match.groups;
                     
-                    let server = getServer(serverId);
+                    let server = getServerById(serverId);
                     if (server == null) {
                         // A new server
                         server = new ServerData(serverId, websocket);
@@ -373,7 +401,7 @@ websocketServer.on("connection", function(websocket) {
                         server.websocket.send("User connected with id: " + connectIdData.userId);
                         
                         // Notify user
-                        websocket.send("Welcome, your user id: " + connectIdData.userId + " username is: " + connectIdData.username);
+                        websocket.send("Welcome, your user id: " + connectIdData.userId + " and your username is: " + connectIdData.username);
                     } else {
                         websocket.send("Invalid link");
                         websocket.close();
@@ -383,6 +411,34 @@ websocketServer.on("connection", function(websocket) {
         } catch (e) {
             console.error("Error while handling websocket message");
             console.error(e);
+        }
+    });
+
+    websocket.on("close", function(code, reason) {
+        connections.delete(websocket);
+        
+        const user = getConnectedUserByWebsocket(websocket);
+        if (user != null) {
+            user.server.connectedUsers.splice(user.server.connectedUsers.indexOf(user), 1);
+            if (user.server.websocket.readyState == 1) {
+                // When a user gets kicked for being connected elsewhere another user with the
+                // same user id is about to connect and the plugin has already removed the user
+                // from the list of users, if the user(s) that got kicked disconnect would send
+                // "User disconnected" messages, chances are the new user would get disconnected
+                // and lost track of on the plugin. We therefore don't send user disconnected when
+                // the close reason is connected-elsewhere, the plugin has already removed the
+                // user from the user list, so it's fine.
+                if (reason != "connected-elsewhere") {
+                    user.server.websocket.send("User disconnected " + user.username);
+                }
+            }
+        }
+
+        const server = getServerByWebsocket(websocket);
+        if (server != null) {
+            console.log("Plugin disconnected from " + server.id);
+            server.websocket = null;
+            server.sendToAll("Has plugin connection? false");
         }
     });
 });
