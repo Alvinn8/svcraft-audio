@@ -366,7 +366,7 @@ websocketServer.on("connection", function(websocket) {
 
                 // A (new) server
                 if (message.startsWith("I am a server")) {
-                    const match = /I am a server with id (?<serverId>[A-z0-9]+)/.match(message);
+                    const match = /I am a server with id (?<serverId>[A-z0-9-]+)/.match(message);
                     const { serverId } = match.groups;
                     
                     let server = getServerById(serverId);
