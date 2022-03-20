@@ -3,6 +3,10 @@ SVCraft Audio configuration.
     hearDistance (default: 32)
 The distance in blocks you need to be to another player to hear them.
 
+    maxVolumeDistance (default: 8)
+The distance in blocks you need to be to another player to hear them
+at full volume.
+
     connectDistance (default: 40)
 The distance in blocks you need to be to another player for their audio to
 start connecting. This should be slightly more than hearDistance because
@@ -22,5 +26,7 @@ The interval in ticks when the update task runs.
 The URL of the svcraft-audio website to connect to.
 
     debug (default: true)
-Whether debug mode is enabled.
-
+Whether debug mode is enabled. Logs additional information to players and the
+console.
+ 
+ 

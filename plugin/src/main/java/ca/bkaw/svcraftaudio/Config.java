@@ -18,27 +18,30 @@ public class Config {
     /**
      * The distance in blocks you need to be to another player to hear them
      * at full volume.
-     * */
+     */
     public final int maxVolumeDistance;
     /**
      * The distance in blocks you need to be to another player for their audio to
      * start connecting. This should be slightly more than hearDistance because
      * connecting isn't instant, therefore players are connected a bit before the
      * players can actually hear each other.
-     * */
+     */
     public final int connectDistance;
     /**
      * The distance in blocks you need to be to another player for their audio to
      * disconnect. This should be set to slightly more than connectDistance to avoid
      * players disconnecting and reconnecting often when being on the edge of the
      * connection range.
-     * */
+     */
     public final int disconnectDistance;
     /** The interval in ticks when the update task runs. */
     public final int updateTaskInterval;
     /** The URI of the svcraft-audio website to connect to. */
     public final URI url;
-    /** Whether debug mode is enabled. */
+    /**
+     * Whether debug mode is enabled. Logs additional information to players and the
+     * console.
+     */
     public final boolean debug;
 
     public Config(FileConfiguration config) {
@@ -47,7 +50,7 @@ public class Config {
         this.connectDistance = getInt(config, "connectDistance", 40);
         this.disconnectDistance = getInt(config, "disconnectDistance", 50);
         this.updateTaskInterval = getInt(config, "updateTaskInterval", 20);
-        this.debug = getBoolean(config, "debug", true);
+        this.debug = getBoolean(config, "debug", false);
         try {
             this.url = new URI(getString(config, "url", "https://svcraft-audio.alvinn8.repl.co"));
         } catch (URISyntaxException e) {
