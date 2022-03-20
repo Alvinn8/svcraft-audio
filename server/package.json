@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "The server running the peer connection broker, static web server, and the svcraft-audio websocket server.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",

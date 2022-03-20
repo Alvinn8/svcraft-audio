@@ -45,7 +45,7 @@ debug: false
 url: https://svcraft-audio.alvinn8.repl.co
 ```
 
-It is recomended to host your own websocket server and change to `url` to that. To do so, download this repository and copy the `server` and `web` folders. Then run `node server.js`. Note that the server needs https and wss, so a host like repl.it might be a good choice.
+It is recomended to host your own websocket server and change to `url` to that. To do so, download this repository and copy the `server` and `web` folders. Then run `npm install` and `node server.js` in the `server` directory. Note that the server needs https and wss, so a host like repl.it might be a good choice.
 
 ## Technical information
 ![image showing the technical parts of how svcraft-audio works.](img/svcraft-audio.svg)
