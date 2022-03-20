@@ -4,3 +4,10 @@ main: ca.bkaw.svcraftaudio.SVCraftAudio
 api-version: 1.13
 depend: [ SVCraft ]
 authors: [ Alvin ]
+permissions:
+  svcraftaudio.command.audio:
+    default: true
+  svcraftaudio.command.admin:
+    default: op
+  svcraftaudio.warn:
+    default: false

@@ -1,6 +1,10 @@
 package ca.bkaw.svcraftaudio;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -15,12 +19,14 @@ import java.util.concurrent.CompletableFuture;
  */
 public class Connection extends WebSocketClient {
     private final SVCraftAudio svcraftAudio;
+    private final UserManager userManager;
     private List<CompletableFuture<Connection>> futures = new ArrayList<>();
     private CommandSender peersInfoSender;
 
-    public Connection(SVCraftAudio svcraftAudio, URI serverUri) {
+    public Connection(SVCraftAudio svcraftAudio, UserManager userManager, URI serverUri) {
         super(serverUri);
         this.svcraftAudio = svcraftAudio;
+        this.userManager = userManager;
 
         this.connect();
     }
@@ -53,6 +59,20 @@ public class Connection extends WebSocketClient {
         this.peersInfoSender = sender;
     }
 
+    /**
+     * Add a new connect id that the websocket server uses to give clients their
+     * user id, username and server id.
+     *
+     * @param connectId The id.
+     * @param userId The user id.
+     * @param username The username.
+     */
+    public void addConnectId(String connectId, String userId, String username) {
+        this.send("New connect id: " + connectId
+            + " with user id " + userId
+            + " and with username: " + username);
+    }
+
     @Override
     public void onOpen(ServerHandshake handshakedata) {
         this.send("I am a server with id " + SVCraftAudio.SERVER_ID);
@@ -65,8 +85,51 @@ public class Connection extends WebSocketClient {
 
     @Override
     public void onMessage(String message) {
+        System.out.println("message = " + message);
         if (message.startsWith("User connected with id: ")) {
-            String userId = message.substring("User connected with id: ".length());
+            String[] parts = message.substring("User connected with id: ".length()).split(" and username: ");
+            String userId = parts[0];
+            String username = parts[1];
+
+            Player player = Bukkit.getPlayer(username);
+            if (player != null) {
+                User user = new User(this.svcraftAudio, userId, player);
+                this.userManager.addNewUser(user);
+                player.sendMessage("You connected to svcraft-audio.");
+            } else {
+                this.send("To " + userId +": You are not on the server");
+            }
+        }
+        else if (message.startsWith("User disconnected ")) {
+            String userId = message.substring("User disconnected ".length());
+            this.userManager.removeUser(userId);
+        }
+        else if (message.startsWith("Warning from user ")) {
+            String[] parts = message.substring("Warning from user ".length()).split(": ");
+            String userId = parts[0];
+            String warn = parts[1];
+
+            Component component = Component.text()
+                .color(NamedTextColor.YELLOW)
+                .append(Component.text("[svcraft-audio warn] "))
+                .append(this.svcraftAudio.getUserComponent(userId))
+                .append(Component.text(": " + warn))
+                .build();
+            Bukkit.broadcast(component, "svcraftaudio.warn");
+        }
+        else if (message.startsWith("Peer info from ") && this.peersInfoSender != null) {
+            String content = message.substring("Peer info from ".length());
+            String[] parts = content.split(": ");
+            String userId = parts[0];
+            String part2 = parts[1];
+
+            Component peersInfo = Component.text(' ' + part2.substring(5),
+                part2.startsWith("good") ? NamedTextColor.GREEN : NamedTextColor.RED);
+
+            this.peersInfoSender.sendMessage(Component.text()
+                .append(this.svcraftAudio.getUserComponent(userId))
+                .append(peersInfo)
+            );
         }
     }
 

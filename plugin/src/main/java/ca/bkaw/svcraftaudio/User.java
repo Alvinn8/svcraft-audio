@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -19,7 +20,7 @@ public class User {
     /**
      * The id of this user. This is also their peer id.
      */
-    private final String userId;
+    private final String id;
     /**
      * The player entity.
      */
@@ -33,9 +34,9 @@ public class User {
      */
     private final Object2DoubleMap<User> sentVolumes = new Object2DoubleOpenHashMap<>();
 
-    public User(SVCraftAudio svcraftAudio, String userId, Player player) {
+    public User(SVCraftAudio svcraftAudio, String id, Player player) {
         this.svcraftAudio = svcraftAudio;
-        this.userId = userId;
+        this.id = id;
         this.player = player;
     }
 
@@ -44,8 +45,8 @@ public class User {
      *
      * @return The user id.
      */
-    public String getUserId() {
-        return this.userId;
+    public String getId() {
+        return this.id;
     }
 
     /**
@@ -67,12 +68,21 @@ public class User {
     }
 
     /**
+     * Get an unmodifiable set of the users that this user can hear.
+     *
+     * @return The unmodifiable set.
+     */
+    public Set<User> getHearingUsers() {
+        return Collections.unmodifiableSet(this.hearingUsers);
+    }
+
+    /**
      * Send a message to this user that is received and handled on the website/client.
      *
      * @param message The message to send.
      */
     private void send(String message) {
-        this.svcraftAudio.getConnection().send("To " + this.userId +": " + message);
+        this.svcraftAudio.getConnection().send("To " + this.id +": " + message);
     }
 
     /**
@@ -106,9 +116,9 @@ public class User {
         this.sentVolumes.put(other, 0);
 
         if (doConnection) {
-            this.send("Connect to " + other.userId);
+            this.send("Connect to " + other.id);
         } else {
-            this.send("Wait for " + other.userId);
+            this.send("Wait for " + other.id);
         }
 
         if (!other.canHear(this)) {
@@ -134,7 +144,7 @@ public class User {
         this.hearingUsers.remove(other);
         this.sentVolumes.removeDouble(other);
 
-        this.send("Disconnect " + other.userId);
+        this.send("Disconnect " + other.id);
 
         if (other.canHear(this)) {
             other.stopHearing(this);
@@ -154,17 +164,35 @@ public class User {
             return location.distanceSquared(otherLocation);
         }
         // Different worlds = infinite distance
-        return Integer.MAX_VALUE;
+        return Double.MAX_VALUE;
     }
 
+    /**
+     * Get the distance to the other user.
+     *
+     * @param other The other use.
+     * @return The distance.
+     */
     public double getDistanceTo(User other) {
         return Math.sqrt(this.getDistanceSqTo(other));
     }
 
+    /**
+     * Get the volume this user should hear the other user at.
+     *
+     * @param other The other user.
+     * @return The volume [0-1].
+     */
     public double getVolumeFor(User other) {
         return this.getVolume(this.getDistanceTo(other));
     }
 
+    /**
+     * Get the volume a user should hear another user at a specified distance.
+     *
+     * @param distance The distance.
+     * @return The volume [0-1].
+     */
     public double getVolume(double distance) {
         //
         //                hearDistance - distance
@@ -177,5 +205,59 @@ public class User {
         if (volume > 1) volume = 1;
         if (volume < 0) volume = 0;
         return volume;
+    }
+
+    /**
+     * Get the last volume that was sent to this user. This will be the volume this
+     * user is currently hearing the other user at.
+     *
+     * @param other The other user.
+     * @return The last sent volume.
+     */
+    public double getLastSentVolumeFor(User other) {
+        return this.sentVolumes.getDouble(other);
+    }
+
+    /**
+     * Set the volume that this user should hear the other user at.
+     *
+     * @param other The other user.
+     * @param volume The volume.
+     */
+    public void setVolumeFor(User other, double volume) {
+        this.sentVolumes.put(other, volume);
+
+        this.send("Volume " + other.id + ": " + volume);
+    }
+
+    /**
+     * Notify the client that the player left the game.
+     */
+    public void sendQuitGame() {
+        this.send("You left the game, goodbye");
+    }
+
+    /**
+     * Notify the client that the user has connected elsewhere.
+     */
+    public void sendConnectedElseWhere() {
+        this.send("You connected elsewhere");
+    }
+
+    /**
+     * Notify the client that it should reload the page.
+     */
+    public void sendReload() {
+        this.send("Reload");
+    }
+
+    /**
+     * Send a raw message to this user, the client might not know how to handle this
+     * if it is not formatted like a known command.
+     *
+     * @param message The message to send.
+     */
+    public void sendRaw(String message) {
+        this.send(message);
     }
 }

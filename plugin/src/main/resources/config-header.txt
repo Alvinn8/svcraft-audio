@@ -5,8 +5,9 @@ The distance in blocks you need to be to another player to hear them.
 
     connectDistance (default: 40)
 The distance in blocks you need to be to another player for their audio to
-start connecting. Connecting can sometimes take a little bit so therefore
-players are connected a bit before the players can actually hear each other.
+start connecting. This should be slightly more than hearDistance because
+connecting isn't instant, therefore players are connected a bit before the
+players can actually hear each other.
 
     disconnectDistance (default: 50)
 The distance in blocks you need to be to another player for their audio to
@@ -18,7 +19,8 @@ connection range.
 The interval in ticks when the update task runs.
 
     url (default: https://svcraft-audio.alvinn8.repl.co)
-The URI of the svcraft-audio website to connect to.
+The URL of the svcraft-audio website to connect to.
 
     debug (default: true)
 Whether debug mode is enabled.
+

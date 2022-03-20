@@ -166,6 +166,31 @@ function connectToPeer() {
 }
 
 /**
+ * Get the microphone stream and assign it to the microphone variable. Returns a
+ * promise that resolves when the microphone is gotten. Will handle errors and
+ * reject in that case.
+ * 
+ * @returns {Promise<void>} The promise.
+ */
+function getMicrophoneStream() {
+    return new Promise(function(resolve, reject) {
+        navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: true
+        })
+        .then(stream => {
+            microphone = stream;
+            resolve();
+        })
+        .catch(err => {
+            document.getElementById("no-microphone-error").innerHTML = err;
+            showPage("no-microphone");
+            reject();
+        });
+    });
+}
+
+/**
  * Handle the call for a new user, this could either be a user that this user just
  * asked to connect to, or it could be an incomming call that was answered.
  *
@@ -250,7 +275,8 @@ function updateConnectionInfo() {
         // ... in that case, send it
         sendConnectedPeers = false;
         if (serverConnection != null && serverConnection.readyState == WebSocket.OPEN) {
-            serverConnection.send("connected-peers " + allGood + ` ${usersCount} / ${connectedUserCount} / ${expectedPeerCount}`);
+            serverConnection.send(`connected-peers ${allGood ? "good" : "bad "} ${usersCount} / ${connectedUserCount} / ${expectedPeerCount}`);
+            // extra space after bad so they're both 4 characters
         }
     }
 
@@ -283,7 +309,7 @@ function connectToServer(serverUrl, connectId) {
 
         serverConnection = new WebSocket(serverUrl);
         serverConnection.addEventListener("open", function () {
-            serverConnection.send("Connect id: " + connectId);
+            serverConnection.send("I am a user, connect id: " + connectId);
         });
         serverConnection.addEventListener("close", function () {
             if (currentPage == "loading"
@@ -344,7 +370,7 @@ function handleMessage(message) {
     }
 
     if (message.startsWith("Volume ")) {
-        const match = /Volume: (?<userId>[A-z0-9-]+): (?<volume>.+)/.exec(message);
+        const match = /Volume (?<userId>[A-z0-9-]+): (?<volume>.+)/.exec(message);
         const { userId, volume } = match.groups;
         setVolumeFor(userId, parseFloat(volume));
     }
@@ -368,9 +394,9 @@ function handleMessage(message) {
     }
     if (message == "You connected elsewhere") {
         showPage("connected-elsewhere");
-        serverConnection.close("connected-elsewhere");
-        serverConnection = null;
         closeAll();
+        serverConnection.close(1000, "connected-elsewhere");
+        serverConnection = null;
     }
 
     if (message == "Reload") {
@@ -523,7 +549,7 @@ window.addEventListener("DOMContentLoaded", function() {
 
 // Entrypoint
 
-(async function() {
+window.addEventListener("DOMContentLoaded", async function() {
     const url = new URL(location.href);
     const connectId = url.searchParams.get("connectId");
 
@@ -537,7 +563,9 @@ window.addEventListener("DOMContentLoaded", function() {
     showPage("connecting");
     document.getElementById("connecting-status").innerHTML = "Connecting to server";
 
-    await connectToServer(serverUrl, connectId);
+    url.protocol = url.protocol.replace(/^http/, "ws");
+    url.search = "";
+    await connectToServer(url.href, connectId);
 
     await connectToPeer();
 
@@ -547,7 +575,7 @@ window.addEventListener("DOMContentLoaded", function() {
     }
 
     updateConnectionInfo();
-})();
+});
 
 setInterval(updateConnectionInfo, 5000);
 setTimeout(updateConnectionInfo, 1000);

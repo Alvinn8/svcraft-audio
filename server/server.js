@@ -39,29 +39,6 @@ app.get("/", (request, response) => {
 
 // === Web Socket ===
 
-const websocketServer = new ws.Server({ noServer: true });
-
-websocketServer.on("connection", function(websocket) {
-    console.log("New connection");
-    websocket.on("message", function (rawMessage) {
-        console.log("Got a message");
-        websocket.send(rawMessage);
-    });
-});
-
-httpServer.on("upgrade", function(request, socket, head) {
-    if (request.url && request.url.startsWith("/peer")) {
-        // A connection to the peer, let the peer server handle the request
-        peerWebSocketListener(request, socket, head);
-    } else {
-        // A connection to the svcraft-audio websocket, let the websocketServer
-        // handle the request.
-        websocketServer.handleUpgrade(request, socket, head, function(socket2) {
-            websocketServer.emit("connection", socket2, request);
-        });
-    }
-});
-
 /**
  * A list of servers that have been registered on this svcraft-audio websocket.
  * @type {ServerData[]}
@@ -76,11 +53,26 @@ const servers = [];
 const connectIds = [];
 
 /**
- * A map of a websocket to a connection handler. Is used to send incomming messages
+ * A map of a websocket to a connection handler. Is used to send incoming messages
  * to the right handler.
  * @type {Map<ws, ConnectionHandler>}
  */
 const connections = new Map();
+
+const websocketServer = new ws.Server({ noServer: true });
+
+httpServer.on("upgrade", function(request, socket, head) {
+    if (request.url && request.url.startsWith("/peer")) {
+        // A connection to the peer, let the peer server handle the request
+        peerWebSocketListener(request, socket, head);
+    } else {
+        // A connection to the svcraft-audio websocket, let the websocketServer
+        // handle the request.
+        websocketServer.handleUpgrade(request, socket, head, function(socket2) {
+            websocketServer.emit("connection", socket2, request);
+        });
+    }
+});
 
 /**
  * Get a server by id.
@@ -145,11 +137,11 @@ function getConnectedUserByWebsocket(websocket) {
 }
 
 /**
- * Something capable of handling incomming messages connections.
+ * Something capable of handling incoming messages connections.
  */
 class ConnectionHandler {
     /**
-     * Handle an incomming message.
+     * Handle an incoming message.
      * 
      * @param {string} message The received message.
      * @abstract
@@ -210,7 +202,7 @@ class ServerData extends ConnectionHandler {
      */
     sendToAll(message) {
         for (const connectedUser of this.connectedUsers) {
-            if (connection.websocket.readyState == 1) {
+            if (connectedUser.websocket.readyState == 1) {
                 connectedUser.websocket.send(message);
             }
         }
@@ -224,20 +216,20 @@ class ServerData extends ConnectionHandler {
     onMessage(message) {
         // Forward messages to users
         if (message.startsWith("To ")) {
-            const match = /^To (?<userId>[A-z0-9]+): (?<userMessage>.*)/.exec(message);
+            const match = /^To (?<userId>[A-z0-9-]+): (?<userMessage>.*)/.exec(message);
             const { userId, userMessage } = match.groups;
 
             const user = this.getConnectedUserById(userId);
             if (user != null) {
                 user.websocket.send(userMessage);
             } else {
-                console.warn("Tried to send message to user that wasn't connected: " + toUsername);
+                console.warn("Tried to send message to user that wasn't connected: " + userId);
             }
         }
 
         // Creation of new connect ids
         if (message.startsWith("New connect id: ")) {
-            const match = /New connect id: (?<connectId>[A-z0-9]+) with user id (?<userId>[A-z0-9]+) and with username: (?<username>.+)/.exec(message);
+            const match = /New connect id: (?<connectId>[A-z0-9]+) with user id (?<userId>[A-z0-9-]+) and with username: (?<username>.+)/.exec(message);
             const { connectId, userId, username } = match.groups;
 
             const data = new ConnectIdData(connectId, userId, username, this);
@@ -247,6 +239,11 @@ class ServerData extends ConnectionHandler {
         // Resync
         if (message == "resync") {
             this.sendToAll("resync");
+        }
+
+        // peers info
+        if (message == "peersinfo") {
+            this.sendToAll("peersinfo");
         }
     }
 }
@@ -336,15 +333,15 @@ class ConnectedUser extends ConnectionHandler {
     onMessage(message) {
         if (message.startsWith("Warning ")) {
             if (this.server != null) {
-                const match = /Warning (?<warning>.+)/.match(message);
+                const match = /Warning (?<warning>.+)/.exec(message);
                 const { warning } = match.groups;
-                this.server.websocket.send("Warning from user " + this.username + ": " + warning);
+                this.server.websocket.send("Warning from user " + this.id + ": " + warning);
             }
         }
 
-        if (message.startsWith("connected-peers")) {
-            if (serverConnection != null) {
-                serverConnection.websocket.send("Peer info from " + this.username + ": " + message.substring("connected-peers".length));
+        if (message.startsWith("connected-peers ")) {
+            if (this.server.websocket.readyState == this.server.websocket.OPEN) {
+                this.server.websocket.send("Peer info from " + this.id + ": " + message.substring("connected-peers ".length));
             }
         }
     }
@@ -358,6 +355,7 @@ websocketServer.on("connection", function(websocket) {
     websocket.on("message", function (rawMessage) {
         try {
             const message = Buffer.isBuffer(rawMessage) ? rawMessage.toString("utf-8") : rawMessage;
+            console.log("> " + message);
             const handler = connections.get(websocket);
             if (handler != null) {
                 handler.onMessage(message);
@@ -366,7 +364,7 @@ websocketServer.on("connection", function(websocket) {
 
                 // A (new) server
                 if (message.startsWith("I am a server")) {
-                    const match = /I am a server with id (?<serverId>[A-z0-9-]+)/.match(message);
+                    const match = /I am a server with id (?<serverId>[A-z0-9-]+)/.exec(message);
                     const { serverId } = match.groups;
                     
                     let server = getServerById(serverId);
@@ -396,10 +394,10 @@ websocketServer.on("connection", function(websocket) {
                         const user = new ConnectedUser(websocket, connectIdData.userId, server);
                         server.connectedUsers.push(user);
                         connections.set(websocket, user);
-                        
+
                         // Notify server
-                        server.websocket.send("User connected with id: " + connectIdData.userId);
-                        
+                        server.websocket.send("User connected with id: " + connectIdData.userId + " and username: " + connectIdData.username);
+
                         // Notify user
                         websocket.send("Welcome, your user id: " + connectIdData.userId + " and your username is: " + connectIdData.username);
                     } else {
@@ -429,7 +427,7 @@ websocketServer.on("connection", function(websocket) {
                 // the close reason is connected-elsewhere, the plugin has already removed the
                 // user from the user list, so it's fine.
                 if (reason != "connected-elsewhere") {
-                    user.server.websocket.send("User disconnected " + user.username);
+                    user.server.websocket.send("User disconnected " + user.id);
                 }
             }
         }
