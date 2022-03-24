@@ -135,11 +135,15 @@ public class Connection extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-
+        this.svcraftAudio.getLogger().info(
+            "Connection closed with code " + code
+                + " reason: \"" + reason + "\" "
+                + " and remote = " + remote
+        );
     }
 
     @Override
     public void onError(Exception ex) {
-
+        ex.printStackTrace();
     }
 }

@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -34,7 +35,7 @@ public final class SVCraftAudio extends JavaPlugin {
         this.getServer().getPluginManager().registerEvents(new EventListener(this.userManager), this);
         this.registerCommand();
 
-        this.connection = new Connection(this, this.userManager, this.config.url);
+        this.connection = new Connection(this, this.userManager, this.getWebsocketUrl());
 
         this.updateTask = new UpdateTask(this, this.userManager);
         this.updateTask.runTaskTimer(this, this.config.updateTaskInterval, this.config.updateTaskInterval);
@@ -67,14 +68,27 @@ public final class SVCraftAudio extends JavaPlugin {
                             Object commandDispatcher = field2.get(commands);
                             CommandDispatcher<BukkitBrigadierCommandSource> dispatcher = (CommandDispatcher<BukkitBrigadierCommandSource>) commandDispatcher;
                             this.command.register(dispatcher);
+                            return;
                         }
                     }
                 }
             }
+            throw new ReflectiveOperationException("Unable to find CommandDispatcher.");
         } catch (ReflectiveOperationException | ClassCastException e) {
             this.getLogger().severe("Failed to register command.");
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Get the url to the svcraft-audio websocket. This will be the url the user has
+     * configured, but with http(s) changed to ws(s).
+     *
+     * @return The url.
+     */
+    private URI getWebsocketUrl() {
+        String href = this.config.url.toString().replaceFirst("^http", "ws");
+        return URI.create(href);
     }
 
     /**
