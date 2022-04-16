@@ -418,7 +418,7 @@ websocketServer.on("connection", function(websocket) {
         const user = getConnectedUserByWebsocket(websocket);
         if (user != null) {
             user.server.connectedUsers.splice(user.server.connectedUsers.indexOf(user), 1);
-            if (user.server.websocket.readyState == 1) {
+            if (user.server.websocket != null && user.server.websocket.readyState == 1) {
                 // When a user gets kicked for being connected elsewhere another user with the
                 // same user id is about to connect and the plugin has already removed the user
                 // from the list of users, if the user(s) that got kicked disconnect would send
