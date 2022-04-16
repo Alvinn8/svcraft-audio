@@ -45,6 +45,7 @@
     <div id="connecting" class="page container">
         <h2 class="display-1"><i class="bi bi-broadcast-pin"></i> Connecting...</h2>
         <p id="connecting-status"></p>
+        <p id="connecting-attempts"></p>
     </div>
 
     <div id="ready" class="page container">
@@ -63,6 +64,11 @@
     <div id="connection-lost" class="page">
         <h2 class="display-1 text-center"><span class="text-danger"><i class="bi bi-broadcast-pin"></i></span> Connection lost</h2>
         <p class="text-center">The connection to the server was lost, try reloading the page.</p>
+    </div>
+
+    <div id="unable-to-connect" class="page">
+        <h2 class="display-1 text-center"><span class="text-danger"><i class="bi bi-broadcast-pin"></i></span> Unable to connect</h2>
+        <p class="text-center">Unable to connect to the <span id="unable-to-connect-subject"></span>. Try reloading the page a few times.</p>
     </div>
 
     <div id="left-the-game" class="page">

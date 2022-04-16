@@ -132,36 +132,57 @@ function connectToPeer() {
 
         document.getElementById("connecting-status").innerHTML = "Connecting to peer";
 
-        peer = new Peer(userId, {
-            host: location.hostname,
-            port: location.port,
-            debug: 1,
-            path: '/peer'
-        });
+        connect();
 
-        peer.on("open", function() {
-            document.getElementById("peer-connection").innerHTML = `<i class="bi bi-check-square-fill text-success"></i> Connected`;
-            updateConnectionInfo();
-            resolve();
-        });
+        function connect() {
+            peer = new Peer(userId, {
+                host: location.hostname,
+                port: location.port,
+                debug: 1,
+                path: '/peer'
+            });
+            peer.on("error", connectionCloseHandler);
 
-        peer.on("close", function() {
-            document.getElementById("peer-connection").innerHTML = `<i class="bi bi-x-square-fill text-danger"></i> Not Connected`;
-            updateConnectionInfo();
-            reject();
-        });
+            peer.on("open", function () {
+                document.getElementById("peer-connection").innerHTML = `<i class="bi bi-check-square-fill text-success"></i> Connected`;
+                document.getElementById("connecting-attempts").innerHTML = "";
+                updateConnectionInfo();
+                resolve();
 
-        peer.on("call", function(call) {
-            for (let i = connectedUsers.length - 1; i >= 0; i--) {
-                const user = connectedUsers[i];
-                if (user.id == call.peer) {
-                    warningLog("Got call for already connected user " + call.peer + ", replacing them");
-                    user.close();
+                peer.on("close", function () {
+                    document.getElementById("peer-connection").innerHTML = `<i class="bi bi-x-square-fill text-danger"></i> Not Connected`;
+                    updateConnectionInfo();
+                });
+
+                peer.on("call", function (call) {
+                    for (let i = connectedUsers.length - 1; i >= 0; i--) {
+                        const user = connectedUsers[i];
+                        if (user.id == call.peer) {
+                            warningLog("Got call for already connected user " + call.peer + ", replacing them");
+                            user.close();
+                        }
+                    }
+                    call.answer(microphone);
+                    newUser(call);
+                });
+            });
+        }
+
+        let attempt = 1;
+        function connectionCloseHandler() {
+            console.log("hello");
+            if (currentPage == "connecting") {
+                attempt++;
+                if (attempt <= 5) {
+                    document.getElementById("connecting-attempts").innerHTML = "Attempt " + attempt;
+                    setTimeout(connect, 5000);
+                } else {
+                    showPage("unable-to-connect");
+                    document.getElementById("unable-to-connect-subject").innerHTML = "peer";
+                    reject();
                 }
             }
-            call.answer(microphone);
-            newUser(call);
-        });
+        }
     });
 }
 
@@ -307,36 +328,62 @@ function updateConnectionInfo() {
 function connectToServer(serverUrl, connectId) {
     return new Promise(function (resolve, reject) {
 
-        serverConnection = new WebSocket(serverUrl);
-        serverConnection.addEventListener("open", function () {
-            serverConnection.send("I am a user, connect id: " + connectId);
-        });
-        serverConnection.addEventListener("close", function () {
-            if (currentPage == "loading"
-            || currentPage == "connecting"
-            || currentPage == "ready") {
-                showPage("connection-lost");
-                closeAll();
+        connect();
+
+        function connect() {
+            serverConnection = new WebSocket(serverUrl);
+            serverConnection.addEventListener("close", connectionCloseHandler);
+
+            serverConnection.addEventListener("open", function () {
+                document.getElementById("connecting-attempts").innerHTML = "";
+
+                // Remove connection close handler
+                serverConnection.removeEventListener("close", connectionCloseHandler);
+
+                // Add events
+                serverConnection.addEventListener("close", function () {
+                    if (currentPage == "loading"
+                        || currentPage == "connecting"
+                        || currentPage == "ready") {
+                        showPage("connection-lost");
+                        closeAll();
+                    }
+                });
+
+                serverConnection.addEventListener("message", function (e) {
+                    const message = e.data + "";
+                    console.log(message);
+
+                    if (message.startsWith("Welcome")) {
+                        const match = /Welcome, your user id: (?<userId>[A-z0-9-]+) and your username is: (?<username>.+)/.exec(message);
+                        userId = match.groups.userId;
+                        username = match.groups.username;
+                        document.getElementById("ready-username").appendChild(document.createTextNode(username));
+                        // We would not be accepted in if there was no connected plugin
+                        hasPluginConnection = true;
+                        resolve();
+                    }
+
+                    handleMessage(message);
+                });
+
+                // Events are ready, send the message and handle the response
+                serverConnection.send("I am a user, connect id: " + connectId);
+            });
+        }
+
+        let attempt = 1;
+        function connectionCloseHandler() {
+            attempt++;
+            if (attempt <= 5) {
+                document.getElementById("connecting-attempts").innerHTML = "Attempt " + attempt;
+                setTimeout(connect, 5000);
+            } else {
+                showPage("unable-to-connect");
+                document.getElementById("unable-to-connect-subject").innerHTML = "server";
+                reject();
             }
-            reject();
-        });
-
-        serverConnection.addEventListener("message", function (e) {
-            const message = e.data + "";
-            console.log(message);
-
-            if (message.startsWith("Welcome")) {
-                const match = /Welcome, your user id: (?<userId>[A-z0-9-]+) and your username is: (?<username>.+)/.exec(message);
-                userId = match.groups.userId;
-                username = match.groups.username;
-                document.getElementById("ready-username").appendChild(document.createTextNode(username));
-                // We would not be accepted in if there was no connected plugin
-                hasPluginConnection = true;
-                resolve();
-            }
-
-            handleMessage(message);
-        });
+        }
     });
 }
 
