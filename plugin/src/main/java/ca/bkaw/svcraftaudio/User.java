@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -68,12 +67,12 @@ public class User {
     }
 
     /**
-     * Get an unmodifiable set of the users that this user can hear.
+     * Get a copy of the set of the users that this user can hear.
      *
-     * @return The unmodifiable set.
+     * @return The set of users.
      */
     public Set<User> getHearingUsers() {
-        return Collections.unmodifiableSet(this.hearingUsers);
+        return new HashSet<>(this.hearingUsers);
     }
 
     /**
