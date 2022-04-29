@@ -1,5 +1,6 @@
 package ca.bkaw.svcraftaudio;
 
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -85,7 +86,6 @@ public class Connection extends WebSocketClient {
 
     @Override
     public void onMessage(String message) {
-        System.out.println("message = " + message);
         if (message.startsWith("User connected with id: ")) {
             String[] parts = message.substring("User connected with id: ".length()).split(" and username: ");
             String userId = parts[0];
@@ -115,7 +115,16 @@ public class Connection extends WebSocketClient {
                 .append(this.svcraftAudio.getUserComponent(userId))
                 .append(Component.text(": " + warn))
                 .build();
-            Bukkit.broadcast(component, "svcraftaudio.warn");
+
+            List<CommandSender> senders = new ArrayList<>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player.hasPermission("svcraftaudio.warn")) {
+                    senders.add(player);
+                }
+            }
+            senders.add(Bukkit.getConsoleSender());
+
+            Audience.audience(senders).sendMessage(component);
         }
         else if (message.startsWith("Peer info from ") && this.peersInfoSender != null) {
             String content = message.substring("Peer info from ".length());
