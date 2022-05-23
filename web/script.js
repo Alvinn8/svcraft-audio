@@ -72,6 +72,11 @@ let currentPage = "loading";
 let testingMicrophone = false;
 
 /**
+ * The last time a hearbeat was received.
+ */
+let lastHeartbeat = Date.now();
+
+/**
  * A user that is connected.
  */
 class ConnectedUser {
@@ -152,6 +157,11 @@ function connectToPeer() {
                 peer.on("close", function () {
                     document.getElementById("peer-connection").innerHTML = `<i class="bi bi-x-square-fill text-danger"></i> Not Connected`;
                     updateConnectionInfo();
+
+                    if (currentPage == "ready") {
+                        console.log("Peer disconnected, attempting to reconnect in 5 seconds");
+                        setTimeout(connectToPeer, 5000);
+                    }
                 });
 
                 peer.on("call", function (call) {
@@ -170,7 +180,6 @@ function connectToPeer() {
 
         let attempt = 1;
         function connectionCloseHandler() {
-            console.log("hello");
             if (currentPage == "connecting") {
                 attempt++;
                 if (attempt <= 5) {
@@ -258,6 +267,12 @@ function updateConnectionInfo() {
         isServerConnected
         ? `<i class="bi bi-check-square-fill text-success"></i> Connected`
         : `<i class="bi bi-x-square-fill text-danger"></i> Not Connected`;
+    
+    const heartbeatTimedOut = Date.now() - lastHeartbeat > 360000; // 6 minutes
+    document.getElementById("heartbeat").innerHTML =
+        heartbeatTimedOut
+        ? `<i class="bi bi-x-square-fill text-danger"></i> Timed out`
+        : `<i class="bi bi-check-square-fill text-success"></i> Received`;
 
     // The connection to the peer connection broker
     document.getElementById("peer-connection").innerHTML =
@@ -471,6 +486,11 @@ function handleMessage(message) {
         expectedConnectedUsers = new Set();
         connectedUsers = [];
     }
+
+    if (message == "Heartbeat") {
+        serverConnection.send("Heartbeat response");
+        lastHeartbeat = Date.now();
+    }
 }
 
 /**
@@ -541,6 +561,10 @@ function disconnectUser(userId) {
         warningLog("Tried to disconnect user that wans't here: " + userId);
     } else if (removalCount != 1) {
         warningLog("Disconnected a user that was here "+ removalCount +" times: " + userId);
+    }
+
+    if (expectedConnectedUsers.has(userId)) {
+        warningLog("An expected user disconnected: " + userId);
     }
 }
 

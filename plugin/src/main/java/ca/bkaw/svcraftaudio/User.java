@@ -32,6 +32,10 @@ public class User {
      * A map of the last volumes that were sent for a specific other user.
      */
     private final Object2DoubleMap<User> sentVolumes = new Object2DoubleOpenHashMap<>();
+    /**
+     * Whether this user is waiting for a heartbeat response.
+     */
+    private boolean awaitingHeartbeatResponse = false;
 
     public User(SVCraftAudio svcraftAudio, String id, Player player) {
         this.svcraftAudio = svcraftAudio;
@@ -251,6 +255,14 @@ public class User {
     }
 
     /**
+     * Send a heartbeat to the client and expect a response.
+     */
+    public void sendHeartbeat() {
+        this.send("Heartbeat");
+        this.awaitingHeartbeatResponse = true;
+    }
+
+    /**
      * Send a raw message to this user, the client might not know how to handle this
      * if it is not formatted like a known command.
      *
@@ -258,5 +270,21 @@ public class User {
      */
     public void sendRaw(String message) {
         this.send(message);
+    }
+
+    /**
+     * Whether this user is waiting for a heartbeat response.
+     *
+     * @return Whether waiting for a heartbeat response.
+     */
+    public boolean isAwaitingHeartbeatResponse() {
+        return this.awaitingHeartbeatResponse;
+    }
+
+    /**
+     * Tell this user that a heartbeat response was received from the client.
+     */
+    public void gotHeartbeatResponse() {
+        this.awaitingHeartbeatResponse = false;
     }
 }

@@ -140,6 +140,13 @@ public class Connection extends WebSocketClient {
                 .append(peersInfo)
             );
         }
+        else if (message.startsWith("Heartbeat response from ")) {
+            String userId = message.substring("Heartbeat response from ".length());
+            User user = this.userManager.getUser(userId);
+            if (user != null) {
+                user.gotHeartbeatResponse();
+            }
+        }
     }
 
     @Override
@@ -149,6 +156,10 @@ public class Connection extends WebSocketClient {
                 + " reason: \"" + reason + "\" "
                 + " and remote = " + remote
         );
+        // Disconnect all users
+        for (User user : new ArrayList<>(this.userManager.getUsers())) {
+            this.userManager.removeUser(user.getId());
+        }
     }
 
     @Override

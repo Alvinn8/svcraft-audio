@@ -37,6 +37,12 @@ app.get("/", (request, response) => {
     response.sendFile(path.resolve(__dirname, "../web/index.html"));
 });
 
+app.post("/heartbeat", (request, response) => {
+    console.log("Got heartbeat");
+    response.statusCode = 204;
+    response.end();
+});
+
 // === Web Socket ===
 
 /**
@@ -342,6 +348,12 @@ class ConnectedUser extends ConnectionHandler {
         if (message.startsWith("connected-peers ")) {
             if (this.server.websocket.readyState == this.server.websocket.OPEN) {
                 this.server.websocket.send("Peer info from " + this.id + ": " + message.substring("connected-peers ".length));
+            }
+        }
+
+        if (message == "Heartbeat response") {
+            if (this.server.websocket.readyState == this.server.websocket.OPEN) {
+                this.server.websocket.send("Heartbeat response from " + this.id);
             }
         }
     }

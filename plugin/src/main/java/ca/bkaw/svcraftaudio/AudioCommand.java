@@ -110,13 +110,13 @@ public class AudioCommand {
                         .then(
                             literal("resync")
                                 .executes(ctx -> {
-                                    resync2(ctx, false);
+                                    resync(ctx, false);
                                     return 1;
                                 })
                                 .then(
                                     literal("silent")
                                         .executes(ctx -> {
-                                            resync2(ctx, true);
+                                            resync(ctx, true);
                                             return 1;
                                         })
                                 )
@@ -257,8 +257,8 @@ public class AudioCommand {
             .decorate(TextDecoration.UNDERLINED));
     }
 
-    private void resync2(CommandContext<BukkitBrigadierCommandSource> ctx, boolean silent) {
-        this.svcraftAudio.getConnection().send("resync2");
+    private void resync(CommandContext<BukkitBrigadierCommandSource> ctx, boolean silent) {
+        this.svcraftAudio.getConnection().send("resync");
 
         if (!silent) {
             for (User user : this.userManager.getUsers()) {
@@ -270,6 +270,6 @@ public class AudioCommand {
             user.getHearingUsers().clear();
         }
 
-        ctx.getSource().getBukkitSender().sendMessage("Everybody is being resynchronise2'd");
+        ctx.getSource().getBukkitSender().sendMessage("Everybody is being resynchronised");
     }
 }

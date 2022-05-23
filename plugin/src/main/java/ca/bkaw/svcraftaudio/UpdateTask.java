@@ -1,7 +1,12 @@
 package ca.bkaw.svcraftaudio;
 
+import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -20,6 +25,10 @@ public class UpdateTask extends BukkitRunnable {
      * The last time the volumes were all resent.
      */
     private long lastVolumeResend = System.currentTimeMillis();
+    /**
+     * The last time a heartbeat request was sent.
+     */
+    private long lastHeartbeat = System.currentTimeMillis();
 
     public UpdateTask(SVCraftAudio svcraftAudio, UserManager userManager) {
         this.svcraftAudio = svcraftAudio;
@@ -81,6 +90,54 @@ public class UpdateTask extends BukkitRunnable {
                 }
             }
             this.lastVolumeResend = System.currentTimeMillis();
+        }
+
+        if (System.currentTimeMillis() - this.lastHeartbeat > 300000) {
+            // Every 5 minutes
+            if (config.debug) {
+                this.svcraftAudio.getLogger().info("Sending heartbeat");
+            }
+            // Send a heartbeat to the http server
+            Bukkit.getScheduler().runTaskAsynchronously(this.svcraftAudio, () -> {
+                String urlString = config.url.toString();
+                if (!urlString.endsWith("/")) {
+                    urlString += '/';
+                }
+                urlString += "heartbeat";
+                try {
+                    URL url = new URL(urlString);
+                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                    connection.setRequestMethod("POST");
+                    int responseCode = connection.getResponseCode();
+                    if (responseCode != 204) {
+                        this.svcraftAudio.getLogger().warning("Heartbeat failed, got status code: " + responseCode);
+                    }
+                } catch (IOException e) {
+                    this.svcraftAudio.getLogger().severe("Failed to send heartbeat: " + e.getMessage());
+                }
+            });
+            // Send a heartbeat to all clients
+            for (User user : users) {
+                user.sendHeartbeat();
+            }
+            // After 30 seconds, disconnect users that did not reply to the heartbeat
+            Bukkit.getScheduler().runTaskLater(this.svcraftAudio, () -> {
+                List<User> toRemove = new ArrayList<>();
+                for (User user : this.userManager.getUsers()) {
+                    if (user.isAwaitingHeartbeatResponse()) {
+                        toRemove.add(user);
+                    }
+                }
+                for (User user : toRemove) {
+                    this.svcraftAudio.getLogger().info(
+                        "Disconnecting " + user.getId() + " (" + user.getName()
+                        + ") due to heartbeat timing out."
+                    );
+                    this.userManager.removeUser(user.getId());
+                }
+            }, 600);
+
+            this.lastHeartbeat = System.currentTimeMillis();
         }
     }
 }
